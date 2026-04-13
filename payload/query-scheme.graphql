@@ -1,0 +1,21 @@
+# mengambil metadata utama dari seluruh schema GraphQL (root schema object)
+# menemukan informasi skema
+
+
+{
+  __schema {
+    # mengambil metadata utama dari seluruh schema GraphQL (root schema object)
+    types {
+      # semua tipe/object yang ada di schema (contoh: User, Site, Workspace)
+      name, 
+
+      fields {
+        # daftar field dari masing-masing type/object
+        name 
+        # contoh: id, email, role, createdAt, dll
+      }
+    }
+  }
+}
+
+

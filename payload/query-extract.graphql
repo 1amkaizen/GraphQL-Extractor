@@ -1,0 +1,37 @@
+{
+  __schema {
+    # mengambil semua tipe dalam schema GraphQL
+    types {
+      name
+
+      # mengambil semua field di setiap type
+      fields {
+        name
+
+        # mengambil argumen dari setiap field (kalau ada)
+        args {
+          name
+          description
+
+          # struktur tipe dari argumen (bisa nested)
+          type {
+            name
+            kind
+
+            # jika tipe adalah wrapper (List/NonNull), ambil tipe dalamnya
+            ofType {
+              name
+              kind
+
+              # nested lagi kalau masih wrapper
+              ofType {
+                name
+                kind
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
