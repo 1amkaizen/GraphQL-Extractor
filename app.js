@@ -1136,8 +1136,45 @@ function renderPESelected(){
   if(el) el.textContent=peSelectedOp?peSelectedOp.name:'—';
 }
 
-function buildPayloadJson(query, variables){
-  return JSON.stringify({query,variables},null,2);
+function getPETransportMode(){
+  return document.querySelector('input[name="pe-transport"]:checked')?.value || 'post';
+}
+
+function getPEEndpoint(){
+  const raw=document.getElementById('pe-endpoint')?.value||'/graphql';
+  const trimmed=raw.trim();
+  return trimmed || '/graphql';
+}
+
+function buildPayloadObject(query, variables, operationName){
+  const payload={query};
+  if(operationName) payload.operationName=operationName;
+  if(variables && Object.keys(variables).length) payload.variables=variables;
+  return payload;
+}
+
+function buildPayloadJson(query, variables, operationName){
+  return JSON.stringify(buildPayloadObject(query, variables, operationName),null,2);
+}
+
+function buildGetUrl(query, variables, operationName){
+  const endpoint=getPEEndpoint();
+  const params=[`query=${encodeURIComponent(query)}`];
+  if(operationName) params.push(`operationName=${encodeURIComponent(operationName)}`);
+  if(variables && Object.keys(variables).length){
+    params.push(`variables=${encodeURIComponent(JSON.stringify(variables))}`);
+  }
+  return `GET ${endpoint}?${params.join('&')}`;
+}
+
+function buildTransportPayload(query, variables, operationName){
+  return getPETransportMode()==='get'
+    ? buildGetUrl(query, variables, operationName)
+    : buildPayloadJson(query, variables, operationName);
+}
+
+function transportLabel(){
+  return getPETransportMode()==='get' ? 'GET URL' : 'POST JSON';
 }
 
 function generateSmartPayload(){
@@ -1154,14 +1191,15 @@ function generateSmartPayload(){
   }
   const blocks=[];
   const baseQuery=buildOperationQuery(op);
+  const baseVars=buildVariables(op,'default');
 
   if(opts.single){
-    blocks.push(`# SINGLE REQUEST\n${baseQuery}`);
+    blocks.push(`# SINGLE REQUEST (${transportLabel()})\n${buildTransportPayload(baseQuery, baseVars, op.name)}`);
   }
   if(opts.alias){
     const aliasBody=aliasTopLevelFields(op.body||'');
     const aliasQuery=buildOperationQuery(op,{name:op.name+'Alias',body:aliasBody});
-    blocks.push(`# ALIASING VERSION\n${aliasQuery}`);
+    blocks.push(`# ALIASING VERSION (${transportLabel()})\n${buildTransportPayload(aliasQuery, baseVars, op.name+'Alias')}`);
   }
   if(opts.fuzz){
     const fuzzSets=[
@@ -1169,16 +1207,27 @@ function generateSmartPayload(){
       {label:'LONG_VALUES',vars:buildVariables(op,'long')},
       {label:'NULL_INJECTION',vars:buildVariables(op,'null')}
     ];
-    blocks.push(`# VARIABLE FUZZING (${fuzzSets.length} variants)`);
+    blocks.push(`# VARIABLE FUZZING (${fuzzSets.length} variants | ${transportLabel()})`);
     fuzzSets.forEach(s=>{
-      blocks.push(`# ${s.label}\n${buildPayloadJson(baseQuery,s.vars)}`);
+      blocks.push(`# ${s.label}\n${buildTransportPayload(baseQuery,s.vars,op.name)}`);
     });
   }
   if(opts.batch){
     const varsA=buildVariables(op,'default');
     const varsB=buildVariables(op,'edge');
-    const batch=JSON.stringify([{query:baseQuery,variables:varsA},{query:baseQuery,variables:varsB}],null,2);
-    blocks.push(`# BATCH REQUEST\n${batch}`);
+    if(getPETransportMode()==='get'){
+      const lines=[
+        buildGetUrl(baseQuery, varsA, op.name),
+        buildGetUrl(baseQuery, varsB, op.name)
+      ];
+      blocks.push(`# BATCH REQUEST (GET mode -> multiple requests)\n${lines.join('\n')}`);
+    } else {
+      const batch=JSON.stringify([
+        buildPayloadObject(baseQuery, varsA, op.name),
+        buildPayloadObject(baseQuery, varsB, op.name)
+      ],null,2);
+      blocks.push(`# BATCH REQUEST (POST JSON)\n${batch}`);
+    }
   }
   const out=document.getElementById('pe-output');
   if(out) out.textContent=blocks.join('\n\n');
@@ -1198,16 +1247,17 @@ function generateErrorPayload(){
   }
   const blocks=[];
   const baseQuery=buildOperationQuery(op);
+  const baseVars=buildVariables(op,'default');
 
   if(opts.invalid){
     const invalidBody=injectInvalidField(op.body||'');
     const invalidQuery=buildOperationQuery(op,{name:op.name+'Invalid',body:invalidBody});
-    blocks.push(`# INVALID FIELD\n${invalidQuery}`);
+    blocks.push(`# INVALID FIELD (${transportLabel()})\n${buildTransportPayload(invalidQuery, baseVars, op.name+'Invalid')}`);
   }
   if(opts.mismatch){
     if(op.params){
       const mismatchVars=buildVariables(op,'mismatch');
-      blocks.push(`# TYPE MISMATCH\n${buildPayloadJson(baseQuery,mismatchVars)}`);
+      blocks.push(`# TYPE MISMATCH (${transportLabel()})\n${buildTransportPayload(baseQuery,mismatchVars,op.name)}`);
     } else {
       blocks.push('# TYPE MISMATCH\n# Operasi ini tidak memiliki variable untuk dimismatch.');
     }
@@ -1215,7 +1265,7 @@ function generateErrorPayload(){
   if(opts.nullinj){
     if(op.params){
       const nullVars=buildVariables(op,'null');
-      blocks.push(`# NULL INJECTION\n${buildPayloadJson(baseQuery,nullVars)}`);
+      blocks.push(`# NULL INJECTION (${transportLabel()})\n${buildTransportPayload(baseQuery,nullVars,op.name)}`);
     } else {
       blocks.push('# NULL INJECTION\n# Operasi ini tidak memiliki variable untuk di-null-kan.');
     }
@@ -1223,7 +1273,7 @@ function generateErrorPayload(){
   if(opts.schema){
     const tampered=tamperFirstArg(op.body||'') || renameFirstTopField(op.body||'');
     const schemaQuery=buildOperationQuery(op,{name:op.name+'SchemaMismatch',body:tampered});
-    blocks.push(`# SCHEMA MISMATCH\n${schemaQuery}`);
+    blocks.push(`# SCHEMA MISMATCH (${transportLabel()})\n${buildTransportPayload(schemaQuery, baseVars, op.name+'SchemaMismatch')}`);
   }
 
   const out=document.getElementById('pe-error-output');

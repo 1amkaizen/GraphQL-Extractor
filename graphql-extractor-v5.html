@@ -342,6 +342,12 @@
 
   <div class="card">
     <div class="card-title">Smart & Error Payload Engine</div>
+    <div class="pe-transport">
+      <div class="pe-transport-label">Transport Mode</div>
+      <label class="pe-option"><input type="radio" name="pe-transport" value="post" checked> POST JSON</label>
+      <label class="pe-option"><input type="radio" name="pe-transport" value="get"> GET URL</label>
+      <input type="text" id="pe-endpoint" class="pe-endpoint" placeholder="/graphql">
+    </div>
     <div class="pe-layout">
       <!-- LEFT: Operation List -->
       <div class="pe-sidebar">
