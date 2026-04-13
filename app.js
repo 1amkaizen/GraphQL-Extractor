@@ -15,17 +15,110 @@ const SENSITIVE_KEYS = [
 
 const STATIC_PAYLOADS = [
   {
-    id: 'introspection-mini',
-    title: 'Introspection (Mini)',
-    desc: 'Ambil tipe root + list semua types untuk recon cepat.',
-    payload: `query IntrospectionMini {
-  __schema {
-    queryType { name }
-    mutationType { name }
-    subscriptionType { name }
-    types { name kind }
+    id: 'introspection-full',
+    title: 'Introspection (Full Voyager Style)',
+    desc: 'Ambil schema lengkap (types, fields, args, directives) untuk full recon seperti GraphQL Voyager.',
+  
+    payload: `query IntrospectionQuery {
+    __schema {
+      queryType { name kind }
+      mutationType { name kind }
+      subscriptionType { name kind }
+  
+      types {
+        ...FullType
+      }
+  
+      directives {
+        name
+        description
+        locations
+        args {
+          ...InputValue
+        }
+      }
+    }
   }
-}`
+  
+  fragment FullType on __Type {
+    kind
+    name
+    description
+  
+    fields(includeDeprecated: true) {
+      name
+      description
+      args {
+        ...InputValue
+      }
+      type {
+        ...TypeRef
+      }
+      isDeprecated
+      deprecationReason
+    }
+  
+    inputFields {
+      ...InputValue
+    }
+  
+    interfaces {
+      ...TypeRef
+    }
+  
+    enumValues(includeDeprecated: true) {
+      name
+      description
+      isDeprecated
+      deprecationReason
+    }
+  
+    possibleTypes {
+      ...TypeRef
+    }
+  }
+  
+  fragment InputValue on __InputValue {
+    name
+    description
+    type {
+      ...TypeRef
+    }
+    defaultValue
+  }
+  
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+        ofType {
+          kind
+          name
+          ofType {
+            kind
+            name
+            ofType {
+              kind
+              name
+              ofType {
+                kind
+                name
+                ofType {
+                  kind
+                  name
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }`
   },
   {
     id: 'root-fields',
@@ -1005,6 +1098,7 @@ function setPEFilter(type, btn){
 
 function renderPEList(){
   filterPEList();
+  renderPESelected();
 }
 
 function filterPEList(){
